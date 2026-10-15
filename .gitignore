@@ -1,0 +1,16 @@
+# Secretos y variables de entorno: nunca subir
+.env
+.env.*
+*.pem
+*.key
+
+# Netlify / Supabase local
+.netlify/
+supabase/.temp/
+supabase/.branches/
+
+# Sistema y editor
+.DS_Store
+Thumbs.db
+.vscode/
+node_modules/
