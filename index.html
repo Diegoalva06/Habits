@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#07070c" />
+  <title>Habits — Construye tu mejor versión</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Fondo aurora -->
+  <div class="aurora" aria-hidden="true">
+    <span class="blob b1"></span>
+    <span class="blob b2"></span>
+    <span class="blob b3"></span>
+    <div class="grain"></div>
+  </div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">🔥</div>
+        <div>
+          <div class="brand-name">Habits</div>
+          <div class="brand-sub">v2026</div>
+        </div>
+      </div>
+
+      <nav class="nav" id="nav">
+        <button class="nav-item active" data-view="today">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <span>Hoy</span>
+        </button>
+        <button class="nav-item" data-view="habits">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+          <span>Hábitos</span>
+        </button>
+        <button class="nav-item" data-view="stats">
+          <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+          <span>Estadísticas</span>
+        </button>
+        <button class="nav-item" data-view="awards">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="6"/><path d="M8.5 14 7 22l5-3 5 3-1.5-8"/></svg>
+          <span>Logros</span>
+        </button>
+        <button class="nav-item" data-view="settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+          <span>Ajustes</span>
+        </button>
+      </nav>
+
+      <div class="level-card" id="levelCard">
+        <div class="level-top">
+          <span class="level-badge" id="levelBadge">Nv. 1</span>
+          <span class="level-xp" id="levelXp">0 XP</span>
+        </div>
+        <div class="xp-bar"><div class="xp-fill" id="xpFill"></div></div>
+        <div class="level-title" id="levelTitle">Novato</div>
+      </div>
+
+      <button class="kbd-hint" id="openPalette">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        Comandos <kbd>Ctrl</kbd><kbd>K</kbd>
+      </button>
+
+      <div class="user-chip" id="userChip" hidden>
+        <div class="avatar" id="userAvatar">?</div>
+        <div class="user-info">
+          <div class="user-name" id="userChipName">—</div>
+          <div class="sync" id="syncStatus" data-state="ok"><i></i><span>Sincronizado</span></div>
+        </div>
+        <button class="icon-btn" data-action="logout" title="Cerrar sesión" aria-label="Cerrar sesión">
+          <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <!-- ============ HOY ============ -->
+      <section class="view active" id="view-today">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow" id="todayDate">—</p>
+            <h1 class="title-row"><span class="title" id="greeting">Hola</span><span class="wave">👋</span></h1>
+            <p class="quote" id="quote"></p>
+          </div>
+          <button class="btn btn-primary" data-action="new">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Nuevo hábito <kbd class="kbd-in">N</kbd>
+          </button>
+          <button class="icon-btn mobile-only" data-view="settings" aria-label="Ajustes">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
+          </button>
+        </header>
+
+        <!-- Bento -->
+        <div class="bento">
+          <div class="card card-progress">
+            <div class="ring-wrap">
+              <svg class="ring" viewBox="0 0 120 120">
+                <defs>
+                  <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#a78bfa"/>
+                    <stop offset="100%" stop-color="#22d3ee"/>
+                  </linearGradient>
+                </defs>
+                <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                <circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52"/>
+              </svg>
+              <div class="ring-label">
+                <span class="ring-pct" id="ringPct">0%</span>
+                <span class="ring-sub" id="ringSub">0 / 0</span>
+              </div>
+            </div>
+            <div class="progress-info">
+              <h3>Progreso del día</h3>
+              <p id="progressMsg">Crea tu primer hábito para empezar.</p>
+            </div>
+          </div>
+
+          <div class="card card-streak">
+            <div class="flame" id="flame">🔥</div>
+            <div class="streak-num" id="globalStreak">0</div>
+            <div class="streak-label">días perfectos seguidos</div>
+            <div class="streak-best">Mejor racha: <b id="globalBest">0</b></div>
+          </div>
+
+          <div class="card card-next">
+            <p class="card-eyebrow">Siguiente hábito</p>
+            <div class="next-body" id="nextHabit">
+              <span class="muted">Nada pendiente 🎉</span>
+            </div>
+          </div>
+
+          <div class="card card-week">
+            <p class="card-eyebrow">Esta semana</p>
+            <div class="week-strip" id="weekStrip"></div>
+          </div>
+        </div>
+
+        <div class="section-head">
+          <h2 id="timelineTitle">Agenda de hoy</h2>
+          <div class="seg" id="todayFilter">
+            <button class="active" data-filter="all">Todos</button>
+            <button data-filter="pending">Pendientes</button>
+            <button data-filter="done">Hechos</button>
+          </div>
+        </div>
+        <div class="timeline" id="timeline"></div>
+      </section>
+
+      <!-- ============ HÁBITOS ============ -->
+      <section class="view" id="view-habits">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Administra</p>
+            <h1 class="title">Tus hábitos</h1>
+          </div>
+          <button class="btn btn-primary" data-action="new">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Nuevo hábito
+          </button>
+        </header>
+
+        <div class="toolbar">
+          <div class="search">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input type="text" id="habitSearch" placeholder="Buscar hábito..." />
+          </div>
+          <div class="chips" id="categoryChips"></div>
+          <select id="habitSort" class="select">
+            <option value="time">Ordenar: hora</option>
+            <option value="streak">Ordenar: racha</option>
+            <option value="rate">Ordenar: cumplimiento</option>
+            <option value="name">Ordenar: nombre</option>
+          </select>
+        </div>
+
+        <div class="habit-grid" id="habitGrid"></div>
+      </section>
+
+      <!-- ============ ESTADÍSTICAS ============ -->
+      <section class="view" id="view-stats">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Analiza</p>
+            <h1 class="title">Estadísticas</h1>
+          </div>
+        </header>
+
+        <div class="kpis" id="kpis"></div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Mapa de constancia</h3>
+            <span class="muted small">Últimas 26 semanas</span>
+          </div>
+          <div class="heatmap-wrap"><div class="heatmap" id="heatmap"></div></div>
+          <div class="heat-legend">
+            <span>Menos</span><i class="l0"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i><span>Más</span>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="card">
+            <div class="card-head"><h3>Últimos 14 días</h3><span class="muted small">% completado</span></div>
+            <div class="bars" id="bars"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Por día de la semana</h3><span class="muted small">Tu mejor día</span></div>
+            <div class="dow" id="dowChart"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Ranking de hábitos</h3><span class="muted small">Cumplimiento últimos 30 días</span></div>
+          <div class="ranking" id="ranking"></div>
+        </div>
+      </section>
+
+      <!-- ============ LOGROS ============ -->
+      <section class="view" id="view-awards">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Desbloquea</p>
+            <h1 class="title">Logros</h1>
+          </div>
+          <div class="awards-count" id="awardsCount">0 / 0</div>
+        </header>
+        <div class="awards" id="awards"></div>
+      </section>
+
+      <!-- ============ AJUSTES ============ -->
+      <section class="view" id="view-settings">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Personaliza</p>
+            <h1 class="title">Ajustes</h1>
+          </div>
+        </header>
+
+        <div class="settings">
+          <div class="card setting" id="accountCard" hidden>
+            <div>
+              <h3>Cuenta</h3>
+              <p class="muted" id="accountEmail">—</p>
+            </div>
+            <button class="btn btn-ghost" data-action="logout">Cerrar sesión</button>
+          </div>
+          <div class="card setting">
+            <div>
+              <h3>Tu nombre</h3>
+              <p class="muted">Para saludarte cada día.</p>
+            </div>
+            <input type="text" id="userName" class="input" placeholder="Ej: Diego" maxlength="24" />
+          </div>
+          <div class="card setting">
+            <div>
+              <h3>Recordatorios</h3>
+              <p class="muted">Notificación a la hora de cada hábito (con la pestaña abierta).</p>
+            </div>
+            <label class="switch"><input type="checkbox" id="notifToggle" /><span></span></label>
+          </div>
+          <div class="card setting">
+            <div>
+              <h3>Formato 12 horas</h3>
+              <p class="muted">Muestra las horas como 7:30 a.m. en vez de 07:30.</p>
+            </div>
+            <label class="switch"><input type="checkbox" id="h12Toggle" /><span></span></label>
+          </div>
+          <div class="card setting">
+            <div>
+              <h3>Sonidos</h3>
+              <p class="muted">Un pequeño "ding" al completar.</p>
+            </div>
+            <label class="switch"><input type="checkbox" id="soundToggle" /><span></span></label>
+          </div>
+          <div class="card setting">
+            <div>
+              <h3>Respaldo</h3>
+              <p class="muted">Exporta o importa tus datos en JSON.</p>
+            </div>
+            <div class="row-btns">
+              <button class="btn btn-ghost" id="exportBtn">Exportar</button>
+              <label class="btn btn-ghost">Importar<input type="file" id="importFile" accept="application/json" hidden /></label>
+            </div>
+          </div>
+          <div class="card setting">
+            <div>
+              <h3>Datos de ejemplo</h3>
+              <p class="muted">Carga hábitos demo con historial para explorar.</p>
+            </div>
+            <button class="btn btn-ghost" id="demoBtn">Cargar demo</button>
+          </div>
+          <div class="card setting danger">
+            <div>
+              <h3>Borrar todo</h3>
+              <p class="muted">Elimina hábitos, historial y logros. No se puede deshacer.</p>
+            </div>
+            <button class="btn btn-danger" id="resetBtn">Borrar</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom nav mobile -->
+    <nav class="bottom-nav" id="bottomNav">
+      <button data-view="today" class="active">☀️<span>Hoy</span></button>
+      <button data-view="habits">🧩<span>Hábitos</span></button>
+      <button class="fab" data-action="new" aria-label="Nuevo hábito">＋</button>
+      <button data-view="stats">📊<span>Stats</span></button>
+      <button data-view="awards">🏆<span>Logros</span></button>
+    </nav>
+  </div>
+
+  <!-- ============ MODAL HÁBITO ============ -->
+  <div class="modal-backdrop" id="habitModal" aria-hidden="true">
+    <form class="modal" id="habitForm" autocomplete="off">
+      <div class="modal-head">
+        <h2 id="modalTitle">Nuevo hábito</h2>
+        <button type="button" class="icon-btn" data-close>✕</button>
+      </div>
+
+      <div class="preview" id="habitPreview">
+        <div class="preview-emoji" id="pvEmoji">💧</div>
+        <div>
+          <div class="preview-name" id="pvName">Tu hábito</div>
+          <div class="preview-meta" id="pvMeta">07:00 · Todos los días</div>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Nombre</span>
+        <input type="text" id="fName" class="input" placeholder="Ej: Beber 2L de agua" maxlength="40" required />
+      </label>
+
+      <div class="field-row">
+        <label class="field">
+          <span>Hora</span>
+          <input type="time" id="fTime" class="input" value="07:00" required />
+        </label>
+        <label class="field">
+          <span>Duración (min)</span>
+          <input type="number" id="fDuration" class="input" min="1" max="600" value="15" />
+        </label>
+      </div>
+
+      <div class="field">
+        <span>Días</span>
+        <div class="days" id="fDays"></div>
+        <div class="day-presets">
+          <button type="button" data-preset="all">Todos</button>
+          <button type="button" data-preset="week">Lun–Vie</button>
+          <button type="button" data-preset="weekend">Fin de semana</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span>Icono</span>
+        <div class="emoji-grid" id="fEmoji"></div>
+      </div>
+
+      <div class="field">
+        <span>Color</span>
+        <div class="colors" id="fColor"></div>
+      </div>
+
+      <div class="field-row">
+        <label class="field">
+          <span>Categoría</span>
+          <select id="fCategory" class="input">
+            <option>Salud</option>
+            <option>Mente</option>
+            <option>Estudio</option>
+            <option>Productividad</option>
+            <option>Fitness</option>
+            <option>Social</option>
+            <option>Finanzas</option>
+            <option>Otro</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Motivo / nota</span>
+          <input type="text" id="fNote" class="input" placeholder="¿Por qué lo haces?" maxlength="60" />
+        </label>
+      </div>
+
+      <div class="modal-foot">
+        <button type="button" class="btn btn-danger-ghost" id="deleteHabitBtn" hidden>Eliminar</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar hábito</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ============ DETALLE HÁBITO ============ -->
+  <div class="modal-backdrop" id="detailModal" aria-hidden="true">
+    <div class="modal modal-wide" id="detailBody"></div>
+  </div>
+
+  <!-- ============ COMMAND PALETTE ============ -->
+  <div class="modal-backdrop palette-backdrop" id="palette" aria-hidden="true">
+    <div class="palette">
+      <div class="palette-input">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="text" id="paletteInput" placeholder="Escribe un comando o un hábito..." />
+        <kbd>Esc</kbd>
+      </div>
+      <ul class="palette-list" id="paletteList"></ul>
+    </div>
+  </div>
+
+  <!-- ============ CONFIRM ============ -->
+  <div class="modal-backdrop" id="confirmModal" aria-hidden="true">
+    <div class="modal modal-sm">
+      <h2 id="confirmTitle">¿Seguro?</h2>
+      <p class="muted" id="confirmText"></p>
+      <div class="modal-foot">
+        <span class="spacer"></span>
+        <button class="btn btn-ghost" id="confirmNo">Cancelar</button>
+        <button class="btn btn-danger" id="confirmYes">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ LOGIN / REGISTRO ============ -->
+  <div class="auth" id="auth" hidden>
+    <div class="auth-card">
+      <div class="brand auth-brand">
+        <div class="brand-logo">🔥</div>
+        <div>
+          <div class="brand-name">Habits</div>
+          <div class="brand-sub">Construye tu mejor versión</div>
+        </div>
+      </div>
+
+      <div class="auth-loading" id="authLoading">
+        <div class="spinner"></div>
+        <p class="muted" id="authLoadingText">Conectando…</p>
+      </div>
+
+      <form class="auth-form" id="authForm" hidden novalidate>
+        <div class="seg auth-tabs" id="authTabs">
+          <button type="button" class="active" data-mode="login">Iniciar sesión</button>
+          <button type="button" data-mode="signup">Crear cuenta</button>
+        </div>
+        <div>
+          <h2 id="authTitle">Bienvenido de nuevo</h2>
+          <p class="muted" id="authSub">Entra para ver tus hábitos y tu racha.</p>
+        </div>
+        <label class="field" id="authNameField">
+          <span>Nombre</span>
+          <input type="text" id="authName" class="input" maxlength="24" autocomplete="name" placeholder="¿Cómo te llamas?" />
+        </label>
+        <label class="field" id="authEmailField">
+          <span>Correo</span>
+          <input type="email" id="authEmail" class="input" autocomplete="email" placeholder="tu@correo.com" />
+        </label>
+        <label class="field" id="authPassField">
+          <span>Contraseña</span>
+          <input type="password" id="authPass" class="input" minlength="6" autocomplete="current-password" placeholder="Mínimo 6 caracteres" />
+        </label>
+        <p class="auth-msg" id="authMsg" role="status"></p>
+        <button type="submit" class="btn btn-primary auth-submit" id="authSubmit">Entrar</button>
+        <div class="auth-links">
+          <button type="button" class="auth-link" id="authForgot">¿Olvidaste tu contraseña?</button>
+          <button type="button" class="auth-link" id="authBack" hidden>← Volver a iniciar sesión</button>
+        </div>
+        <div id="authGoogleBox" hidden>
+          <div class="auth-divider"><span>o</span></div>
+          <button type="button" class="btn btn-ghost auth-google" id="authGoogle">
+            <svg viewBox="0 0 48 48" class="g-logo"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+            Continuar con Google
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
