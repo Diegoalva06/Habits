@@ -69,6 +69,10 @@
         Comandos <kbd>Ctrl</kbd><kbd>K</kbd>
       </button>
 
+      <button class="donate-btn" data-action="donate">
+        <span class="donate-heart">💜</span> Apoyar Habits
+      </button>
+
       <div class="user-chip" id="userChip" hidden>
         <div class="avatar" id="userAvatar">?</div>
         <div class="user-info">
@@ -299,6 +303,13 @@
             </div>
             <button class="btn btn-ghost" id="demoBtn">Cargar demo</button>
           </div>
+          <div class="card setting">
+            <div>
+              <h3>Apoya Habits 💜</h3>
+              <p class="muted">Si la app te ayuda, puedes invitarme un café por Nequi.</p>
+            </div>
+            <button class="btn btn-ghost" data-action="donate">Donar</button>
+          </div>
           <div class="card setting danger">
             <div>
               <h3>Borrar todo</h3>
@@ -427,6 +438,37 @@
         <span class="spacer"></span>
         <button class="btn btn-ghost" id="confirmNo">Cancelar</button>
         <button class="btn btn-danger" id="confirmYes">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DONACIONES ============ -->
+  <div class="modal-backdrop" id="donateModal" aria-hidden="true">
+    <div class="modal modal-sm donate">
+      <div class="modal-head">
+        <h2>Apoya Habits 💜</h2>
+        <button type="button" class="icon-btn" data-close aria-label="Cerrar">✕</button>
+      </div>
+      <p class="muted">Si Habits te ayuda a construir tu mejor versión, puedes invitarme un café ☕. Cualquier aporte suma.</p>
+
+      <div class="donate-key">
+        <span class="donate-label">Llave Bre-B · Nequi</span>
+        <div class="donate-key-row">
+          <code id="donateKey">—</code>
+          <button type="button" class="btn btn-primary" data-action="copy-key">Copiar</button>
+        </div>
+        <span class="donate-label">A nombre de: Diego A.</span>
+      </div>
+
+      <ol class="donate-steps">
+        <li>Copia la llave.</li>
+        <li>Abre Nequi, Bancolombia, Daviplata o tu banco.</li>
+        <li>Elige <b>Enviar → Llave Bre-B</b>, pega la llave y el valor.</li>
+      </ol>
+
+      <div class="modal-foot">
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-ghost" data-close>Cerrar</button>
       </div>
     </div>
   </div>

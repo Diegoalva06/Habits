@@ -709,3 +709,30 @@ input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
   .bat, .ghost, .spider { display: none; }
 }
 .halloween { --grad: linear-gradient(135deg, #fb923c 0%, #e8590c 35%, #a855f7 100%); }
+
+/* =========================================================
+   DONACIONES 💜
+   ========================================================= */
+.donate-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 12px; border-radius: 12px;
+  font-size: 13.5px; font-weight: 600; color: var(--text);
+  background: linear-gradient(135deg, rgba(236, 72, 153, .16), rgba(167, 139, 250, .16));
+  border: 1px solid rgba(236, 72, 153, .35); transition: .25s var(--ease);
+}
+.donate-btn:hover { transform: translateY(-1px); border-color: rgba(236, 72, 153, .7); box-shadow: 0 8px 24px -8px rgba(236, 72, 153, .55); }
+.donate-heart { display: inline-block; animation: heartbeat 2.4s ease-in-out infinite; }
+@keyframes heartbeat { 0%, 60%, 100% { transform: scale(1); } 10%, 30% { transform: scale(1.22); } 20% { transform: scale(1.05); } }
+
+.donate-key {
+  display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 16px;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+}
+.donate-label { font-size: 11px; color: var(--text-3); letter-spacing: .08em; text-transform: uppercase; }
+.donate-key-row { display: flex; align-items: center; gap: 10px; }
+.donate-key-row code {
+  flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--display); font-size: 16px; font-weight: 600;
+  user-select: all;
+}
+.donate-key-row .btn { flex-shrink: 0; }
+.donate-steps { display: flex; flex-direction: column; gap: 6px; padding-left: 20px; font-size: 13.5px; color: var(--text-2); }
+.donate-steps b { color: var(--text); }

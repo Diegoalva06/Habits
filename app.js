@@ -744,6 +744,29 @@ function closeModal(el) {
 }
 const anyModalOpen = () => $$('.modal-backdrop.open').length > 0;
 
+/* ---------- Donaciones (Nequi / Bre-B) ----------
+   La llave se arma al abrir la ventana para que los robots
+   que buscan correos en el código no la lean tan fácil. */
+const DONATE_KEY = ['theholadiego', 'gmail.com'];
+const donateKey = () => DONATE_KEY.join('@');
+function openDonate() {
+  $('#donateKey').textContent = donateKey();
+  openModal($('#donateModal'));
+}
+async function copyDonateKey(btn) {
+  try {
+    await navigator.clipboard.writeText(donateKey());
+  } catch {
+    // Navegadores sin portapapeles: selecciona el texto para copiarlo a mano
+    getSelection().selectAllChildren($('#donateKey'));
+    toast('📋', 'Selecciona y copia la llave', 'Tu navegador no permitió copiar automáticamente.');
+    return;
+  }
+  btn.textContent = '¡Copiada!';
+  setTimeout(() => { btn.textContent = 'Copiar'; }, 1800);
+  toast('💜', '¡Gracias por tu apoyo!', 'Llave copiada. Pégala en tu app como llave Bre-B.');
+}
+
 function confirmDialog(title, text, okLabel = 'Confirmar') {
   return new Promise(resolve => {
     const m = $('#confirmModal');
@@ -1092,6 +1115,9 @@ function bind() {
     if (t.closest('[data-action="new"]')) return openHabitModal();
     if (t.closest('[data-action="demo"]')) return loadDemo();
     if (t.closest('[data-action="logout"]')) return logout();
+    if (t.closest('[data-action="donate"]')) return openDonate();
+    const ck = t.closest('[data-action="copy-key"]');
+    if (ck) return copyDonateKey(ck);
     const op = t.closest('[data-open]');
     if (op) return openDetail(op.dataset.open);
     const ed = t.closest('[data-edit]');
