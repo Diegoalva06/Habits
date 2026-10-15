@@ -621,3 +621,91 @@ input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
   border-top-color: var(--violet); border-right-color: var(--cyan); animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* =========================================================
+   MODO HALLOWEEN 🎃 (lo activa halloween.js en octubre)
+   ========================================================= */
+.halloween .b1 { background: #6d28d9; }
+.halloween .b2 { background: #ea580c; opacity: .3; }
+.halloween .b3 { background: #15803d; opacity: .12; }
+.halloween ::selection { background: rgba(251, 146, 60, .35); }
+.halloween .auth {
+  background: radial-gradient(ellipse at top, rgba(234, 88, 12, .16), transparent 60%), rgba(9, 6, 14, .92);
+}
+
+.spooky-back, .spooky-front { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
+.spooky-back { z-index: 0; }
+.spooky-front { z-index: 80; }
+.spooky-back svg, .spooky-front svg { width: 100%; height: auto; stroke: none; stroke-width: 0; }
+
+/* Luna */
+.moon {
+  position: absolute; top: 22px; right: 34%; width: 90px; height: 90px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fffbeb, #fde68a 55%, #f59e0b);
+  box-shadow: 0 0 60px 10px rgba(253, 224, 71, .25), 0 0 140px 40px rgba(251, 146, 60, .12);
+  opacity: .55;
+}
+
+/* Calabazas */
+.pumpkin { position: absolute; bottom: 8px; filter: drop-shadow(0 0 22px rgba(251, 146, 60, .45)); opacity: .9; }
+.pk-1 { left: 280px; width: 96px; }
+.pk-2 { right: 28px; width: 140px; }
+.pk-3 { right: 172px; width: 78px; transform: rotate(-6deg); }
+.pk-body { fill: #ea580c; }
+.pk-mid { fill: #f97316; }
+.pk-stem { fill: #4d7c0f; }
+.pk-face { fill: #fde047; animation: candle 2.4s ease-in-out infinite; }
+.pk-2 .pk-face { animation-delay: -.8s; }
+.pk-3 .pk-face { animation-delay: -1.6s; }
+@keyframes candle {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 6px #facc15); }
+  40% { opacity: .7; }
+  60% { opacity: .95; filter: drop-shadow(0 0 2px #facc15); }
+}
+
+/* Fantasma */
+.ghost { position: absolute; top: 34%; left: -80px; width: 60px; opacity: .22; animation: ghost-drift 48s linear infinite; }
+.ghost svg { animation: ghost-bob 3s ease-in-out infinite alternate; }
+.gh-body { fill: #ede9fe; }
+.gh-eye { fill: #1e1029; }
+@keyframes ghost-drift { to { transform: translateX(calc(100vw + 160px)); } }
+@keyframes ghost-bob { from { transform: translateY(-10px) rotate(-4deg); } to { transform: translateY(10px) rotate(4deg); } }
+
+/* Murciélagos */
+.bat { position: absolute; left: 0; top: 0; width: 50px; opacity: 0; animation: bat-fly 26s linear infinite; }
+.bat svg { fill: #0d0814; filter: drop-shadow(0 0 5px rgba(251, 146, 60, .6)); animation: flap .28s ease-in-out infinite alternate; transform-origin: 50% 40%; }
+.bat-1 { --y: 12vh; animation-duration: 24s; }
+.bat-2 { --y: 26vh; width: 38px; animation-duration: 31s; animation-delay: -9s; }
+.bat-3 { --y: 8vh; width: 52px; animation-duration: 28s; animation-delay: -17s; }
+.bat-4 { --y: 44vh; width: 34px; animation-duration: 36s; animation-delay: -4s; }
+.bat-5 { --y: 18vh; width: 42px; animation-duration: 33s; animation-delay: -24s; }
+.bat-2 svg, .bat-4 svg { animation-duration: .22s; }
+@keyframes bat-fly {
+  0%   { transform: translate(-10vw, var(--y)); opacity: 0; }
+  4%   { opacity: .9; }
+  25%  { transform: translate(22vw, calc(var(--y) - 6vh)); }
+  50%  { transform: translate(50vw, calc(var(--y) + 5vh)); }
+  75%  { transform: translate(78vw, calc(var(--y) - 4vh)); }
+  96%  { opacity: .9; }
+  100% { transform: translate(110vw, var(--y)); opacity: 0; }
+}
+@keyframes flap { to { transform: scaleY(.55); } }
+
+/* Telaraña y araña */
+.web { position: absolute; top: 0; right: 0; width: 150px; opacity: .22; }
+.web svg { fill: none; stroke: #fff; stroke-width: 1; }
+.spider { position: absolute; top: 0; right: 22px; display: flex; flex-direction: column; align-items: center; }
+.spider .thread { width: 1px; height: 70px; background: rgba(255, 255, 255, .35); animation: spider-drop 5s ease-in-out infinite; }
+.spider .body { font-size: 20px; line-height: 1; margin-top: -4px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .6)); }
+@keyframes spider-drop { 0%, 100% { height: 40px; } 50% { height: 110px; } }
+
+@media (max-width: 820px) {
+  .pumpkin { display: none; }
+  .moon { top: 90px; right: 8%; width: 60px; height: 60px; }
+  .web { width: 100px; }
+  .spider { right: 74px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bat, .ghost, .spider { display: none; }
+}
+.halloween { --grad: linear-gradient(135deg, #fb923c 0%, #e8590c 35%, #a855f7 100%); }

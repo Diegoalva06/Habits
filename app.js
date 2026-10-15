@@ -926,7 +926,9 @@ function loopConfetti() {
   raf = parts.length ? requestAnimationFrame(loopConfetti) : null;
 }
 function celebrate() {
-  const c = ['#a78bfa', '#22d3ee', '#f472b6', '#fbbf24', '#34d399', '#ffffff'];
+  const c = document.documentElement.classList.contains('halloween')
+    ? ['#f97316', '#fb923c', '#facc15', '#a855f7', '#7c3aed', '#84cc16', '#ffffff']
+    : ['#a78bfa', '#22d3ee', '#f472b6', '#fbbf24', '#34d399', '#ffffff'];
   burst(innerWidth * 0.15, innerHeight * 0.8, 70, c);
   burst(innerWidth * 0.85, innerHeight * 0.8, 70, c);
   setTimeout(() => burst(innerWidth * 0.5, innerHeight * 0.35, 90, c), 250);
