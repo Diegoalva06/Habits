@@ -635,7 +635,8 @@ input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 
 .spooky-back, .spooky-front { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
 .spooky-back { z-index: 0; }
-.spooky-front { z-index: 80; }
+.spooky-front { z-index: 80; transition: opacity .3s; }
+body:has(.modal-backdrop.open) .spooky-front { opacity: 0; }
 .spooky-back svg, .spooky-front svg { width: 100%; height: auto; stroke: none; stroke-width: 0; }
 
 /* Luna */
@@ -736,3 +737,10 @@ input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1); opaci
 .donate-key-row .btn { flex-shrink: 0; }
 .donate-steps { display: flex; flex-direction: column; gap: 6px; padding-left: 20px; font-size: 13.5px; color: var(--text-2); }
 .donate-steps b { color: var(--text); }
+.donate-qr { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.donate-qr img {
+  width: 100%; max-width: 250px; height: auto; padding: 6px; border-radius: 18px; background: #fff;
+  box-shadow: 0 12px 40px -12px rgba(236, 72, 153, .55);
+}
+.donate-qr figcaption { font-size: 12px; color: var(--text-3); }
+@media (min-width: 821px) { .donate-qr img { max-width: 300px; } }
