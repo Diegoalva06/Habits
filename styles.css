@@ -744,3 +744,15 @@ body:has(.modal-backdrop.open) .spooky-front { opacity: 0; }
 }
 .donate-qr figcaption { font-size: 12px; color: var(--text-3); }
 @media (min-width: 821px) { .donate-qr img { max-width: 300px; } }
+
+/* =========================================================
+   RECUPERACIÓN (si algo falla al pintar) y CAPTCHA
+   ========================================================= */
+.crash {
+  position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px;
+  background: rgba(7, 7, 12, .88); backdrop-filter: blur(6px);
+}
+.crash-card { max-width: 440px; width: 100%; text-align: center; display: grid; gap: 10px; }
+.crash-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 8px; }
+.auth-captcha { display: flex; justify-content: center; min-height: 65px; }
+.search input { -webkit-appearance: none; appearance: none; }

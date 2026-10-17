@@ -14,8 +14,8 @@ const DAY_LETTER = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
 const DAY_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // semana empieza en lunes
-const EMOJIS = ['💧', '🧘', '📚', '💪', '🏃', '💻', '🥗', '😴', '✍️', '🎸', '🧠', '🌅', '🚭', '💊', '🧹', '💰', '🙏', '🎨', '🚴', '🏊', '🍎', '☕', '📵', '🗣️', '🌱', '🎯', '📝', '🦷', '🐶', '🎧'];
-const COLORS = ['#a78bfa', '#22d3ee', '#f472b6', '#fb923c', '#34d399', '#facc15', '#f87171', '#60a5fa', '#a3e635'];
+const { EMOJIS, COLORS, defaults, pad, dk, parseDk, startOfDay, addDays, isScheduled } = HabitsCore;
+const COLOR_NAMES = ['violeta', 'cian', 'rosa', 'naranja', 'verde', 'amarillo', 'rojo', 'azul', 'lima'];
 const MILESTONES = [3, 7, 14, 21, 30, 50, 100, 180, 365];
 const LEVEL_TITLES = ['Novato', 'Aprendiz', 'Constante', 'Disciplinado', 'Enfocado', 'Imparable', 'Maestro', 'Élite', 'Leyenda', 'Mítico'];
 const QUOTES = [
@@ -36,36 +36,43 @@ const QUOTES = [
 ];
 
 /* ---------------- Estado ---------------- */
-const defaults = () => ({
-  habits: [],
-  log: {},                 // { 'YYYY-MM-DD': [habitId, ...] }
-  settings: { name: '', notifications: false, sound: true, h12: false },
-  unlocked: {},            // { achievementId: 'YYYY-MM-DD' }
-  notified: {},            // { 'YYYY-MM-DD|habitId': 1 }
-});
-
 /** ¿Hay sesión con Supabase? Si no, la app trabaja en modo local. */
 const cloud = () => DB.enabled && !!DB.user;
 // En modo nube, localStorage es solo una caché por usuario (para notified y arranque sin red).
 const storeKey = () => (cloud() ? `${STORE_KEY}:${DB.user.id}` : STORE_KEY);
 
+/** Todo lo que entra (localStorage, respaldo, servidor) pasa por aquí. */
+const sanitize = raw => HabitsCore.sanitizeState(raw, today());
+
 function load(key = storeKey()) {
   try {
     const raw = JSON.parse(localStorage.getItem(key));
     if (!raw || !Array.isArray(raw.habits)) return defaults();
-    return merge(raw);
+    return sanitize(raw);
   } catch {
     return defaults();
   }
 }
-function merge(raw) {
-  const d = defaults();
-  return { ...d, ...raw, settings: { ...d.settings, ...raw.settings } };
-}
 let state = defaults();
-const save = () => {
-  try { localStorage.setItem(storeKey(), JSON.stringify(state)); } catch { /* sin almacenamiento */ }
-};
+let stateVersion = 0;      // sube con cada cambio: invalida computeAll() y detecta ediciones locales
+let saveWarned = false;
+/** Guarda en localStorage. Si no se puede (cuota llena, modo privado), avisa una vez. */
+function save() {
+  stateVersion++;
+  try {
+    localStorage.setItem(storeKey(), JSON.stringify(state));
+    saveWarned = false;
+    return true;
+  } catch (err) {
+    console.error('[save]', err);
+    if (!saveWarned) {
+      saveWarned = true;
+      toast('💾', 'No se pudo guardar en este dispositivo',
+        cloud() ? 'Tus cambios se siguen enviando a tu cuenta.' : 'Exporta un respaldo en Ajustes para no perder datos.', { ms: 7000 });
+    }
+    return false;
+  }
+}
 /** Guarda ajustes y logros (local + nube). */
 const saveProfile = () => {
   save();
@@ -90,11 +97,6 @@ const ui = {
 };
 
 /* ---------------- Fechas ---------------- */
-const pad = n => String(n).padStart(2, '0');
-const dk = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-const parseDk = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
-const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const today = () => startOfDay(new Date());
 const todayKey = () => dk(new Date());
 const mondayOf = d => addDays(startOfDay(d), -((d.getDay() + 6) % 7));
@@ -123,58 +125,22 @@ function fmtDays(days) {
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-// UUID v4 (Postgres lo exige). randomUUID solo existe en HTTPS/localhost; si no, se arma con getRandomValues.
-const uid = () => crypto.randomUUID?.() ??
-  '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
-    (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16));
+// UUID v4 (Postgres lo exige). randomUUID solo existe en HTTPS/localhost; si no, se arma con
+// getRandomValues, y en navegadores sin Web Crypto, con Math.random.
+function uid() {
+  const c = globalThis.crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  const rnd = c?.getRandomValues ? () => c.getRandomValues(new Uint8Array(1))[0] : () => Math.floor(Math.random() * 256);
+  return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, ch => (ch ^ (rnd() & (15 >> (ch / 4)))).toString(16));
+}
 const isUuid = s => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 
-/* ---------------- Núcleo: rachas y estadísticas ---------------- */
+/* ---------------- Núcleo: rachas y estadísticas (ver core.js) ---------------- */
 const getHabit = id => state.habits.find(h => h.id === id);
-const isScheduled = (h, d) => h.days.includes(d.getDay()) && dk(d) >= h.createdAt;
-const isDone = (h, key) => (state.log[key] || []).includes(h.id);
-
-/**
- * Racha por hábito: solo cuentan los días programados.
- * Un día no programado no rompe la racha, y hoy pendiente tampoco.
- */
-function habitStats(h) {
-  const t = today(), tk = dk(t), from30 = addDays(t, -29);
-  let run = 0, best = 0, total = 0, sched30 = 0, done30 = 0;
-  for (let d = parseDk(h.createdAt); d <= t; d = addDays(d, 1)) {
-    if (!isScheduled(h, d)) continue;
-    const key = dk(d), done = isDone(h, key);
-    if (done) { run++; total++; best = Math.max(best, run); }
-    else if (key !== tk) run = 0;
-    if (d >= from30 && (done || key !== tk)) { sched30++; if (done) done30++; }
-  }
-  return { current: run, best, total, rate30: sched30 ? Math.round((done30 / sched30) * 100) : 0 };
-}
-
-function dayInfo(d) {
-  const key = dk(d);
-  const sched = state.habits.filter(h => isScheduled(h, d));
-  const done = sched.filter(h => isDone(h, key)).length;
-  return { key, total: sched.length, done, perfect: sched.length > 0 && done === sched.length };
-}
-
-function earliestDate() {
-  if (!state.habits.length) return today();
-  return parseDk(state.habits.reduce((m, h) => (h.createdAt < m ? h.createdAt : m), todayKey()));
-}
-
-/** Racha global = días perfectos seguidos (todos los hábitos programados completados). */
-function globalStats() {
-  const t = today(), tk = dk(t);
-  let run = 0, best = 0, perfectDays = 0;
-  for (let d = earliestDate(); d <= t; d = addDays(d, 1)) {
-    const info = dayInfo(d);
-    if (!info.total) continue;
-    if (info.perfect) { run++; perfectDays++; best = Math.max(best, run); }
-    else if (info.key !== tk) run = 0;
-  }
-  return { current: run, best, perfectDays };
-}
+const isDone = (h, key) => HabitsCore.isDone(state.log, h, key);
+const habitStats = h => HabitsCore.habitStats(h, state.log, today());
+const dayInfo = d => HabitsCore.dayInfo(state.habits, state.log, d);
+const globalStats = () => HabitsCore.globalStats(state.habits, state.log, today());
 
 function levelFromXp(xp) {
   // Nivel L requiere 50·L·(L-1) XP → 0, 100, 300, 600, 1000...
@@ -184,12 +150,18 @@ function levelFromXp(xp) {
   return { level: L, xp, base, next, pct: ((xp - base) / (next - base)) * 100, title: LEVEL_TITLES[Math.min(L - 1, LEVEL_TITLES.length - 1)] };
 }
 
+/** Rachas, XP y nivel. Se memoriza: solo se recalcula si cambió el estado o el día. */
+let memo = null;
 function computeAll() {
+  const key = `${stateVersion}|${todayKey()}`;
+  if (memo && memo.key === key && memo.state === state) return memo.val;
   const perHabit = new Map(state.habits.map(h => [h.id, habitStats(h)]));
   const g = globalStats();
   const completions = [...perHabit.values()].reduce((s, x) => s + x.total, 0);
   const xp = completions * 10 + g.perfectDays * 25;
-  return { perHabit, global: g, completions, lvl: levelFromXp(xp) };
+  const val = { perHabit, global: g, completions, lvl: levelFromXp(xp) };
+  memo = { key, state, val };
+  return val;
 }
 
 /* ---------------- Logros ---------------- */
@@ -311,14 +283,25 @@ function go(view) {
   $$('.nav-item, .bottom-nav [data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   $$('.view').forEach(v => v.classList.toggle('active', v.id === `view-${view}`));
   try { localStorage.setItem('habits.view', view); } catch { /* ignore */ }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   render();
 }
 
 /* =========================================================
    RENDER
    ========================================================= */
+/** Nunca deja la app en blanco: si algo falla al pintar, muestra una pantalla de recuperación. */
 function render() {
+  try {
+    renderViews();
+    $('#crash')?.remove();
+  } catch (err) {
+    console.error('[render]', err);
+    showCrash();
+  }
+}
+
+function renderViews() {
   // Las animaciones de entrada solo se reproducen al cambiar de vista
   document.body.classList.toggle('quiet', !ui.animate);
   ui.animate = false;
@@ -332,6 +315,42 @@ function render() {
   if (ui.detailId && $('#detailModal').classList.contains('open')) renderDetail(all);
 }
 
+function showCrash() {
+  if ($('#crash')) return;
+  const el = document.createElement('div');
+  el.id = 'crash';
+  el.className = 'crash';
+  el.setAttribute('role', 'alertdialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'crashTitle');
+  el.innerHTML = `
+    <div class="card crash-card">
+      <div class="empty-icon">🛠️</div>
+      <h2 id="crashTitle">Algo salió mal al mostrar tus datos</h2>
+      <p class="muted">Puede que los datos guardados en este dispositivo estén dañados.
+        Descarga un respaldo antes de restaurar.</p>
+      <p class="muted small">${cloud()
+        ? 'Restaurar borra solo la copia de este dispositivo y vuelve a cargar tus hábitos desde tu cuenta.'
+        : 'Restaurar borra los hábitos guardados en este navegador.'}</p>
+      <div class="crash-actions">
+        <button class="btn btn-ghost" data-crash="retry">Reintentar</button>
+        <button class="btn btn-ghost" data-crash="export">Descargar respaldo</button>
+        <button class="btn btn-danger" data-crash="restore">Restaurar</button>
+      </div>
+    </div>`;
+  el.addEventListener('click', e => {
+    const a = e.target.closest('[data-crash]')?.dataset.crash;
+    if (a === 'retry') { el.remove(); state = sanitize(state); save(); render(); }
+    if (a === 'export') exportData();
+    if (a === 'restore') {
+      try { localStorage.removeItem(storeKey()); } catch { /* ignore */ }
+      location.reload();
+    }
+  });
+  document.body.append(el);
+  el.querySelector('button').focus();
+}
+
 function renderSidebar(all) {
   const L = all.lvl;
   $('#levelBadge').textContent = `Nv. ${L.level}`;
@@ -339,7 +358,7 @@ function renderSidebar(all) {
   $('#xpFill').style.width = `${Math.max(2, L.pct)}%`;
   $('#levelTitle').textContent = `${L.title} · ${L.xp} XP totales`;
   if (cloud()) {
-    const display = state.settings.name || DB.user.email.split('@')[0];
+    const display = state.settings.name || (DB.user.email || 'Tú').split('@')[0] || 'Tú';
     $('#userAvatar').textContent = display[0].toUpperCase();
     $('#userChipName').textContent = display;
   }
@@ -407,9 +426,9 @@ function renderNext() {
   }
   box.style.setProperty('--hc', h.color);
   box.innerHTML = `
-    <div class="next-emoji" style="background:color-mix(in srgb, ${h.color} 20%, transparent)">${h.emoji}</div>
+    <div class="next-emoji" style="background:color-mix(in srgb, ${esc(h.color)} 20%, transparent)">${esc(h.emoji)}</div>
     <div class="next-name">${esc(h.name)}</div>
-    <div class="next-when">${fmtTime(h.time)} · ${fmtDuration(h.duration)}</div>
+    <div class="next-when">${esc(fmtTime(h.time))} · ${fmtDuration(h.duration)}</div>
     <div class="countdown" id="countdown" data-time="${h.time}" data-dur="${h.duration}"></div>`;
   updateCountdown();
 }
@@ -493,9 +512,9 @@ function renderTimeline(all, sel, isToday) {
       }
     } else if (!done && !isToday) tag = `<span class="tag late">No completado</span>`;
     html += `
-      <div class="t-item ${done ? 'done' : ''}" style="--hc:${h.color};animation-delay:${i * 40}ms" data-open="${h.id}">
-        <span class="t-time">${fmtTime(h.time)}</span>
-        <div class="t-emoji">${h.emoji}</div>
+      <div class="t-item ${done ? 'done' : ''}" style="--hc:${esc(h.color)};animation-delay:${i * 40}ms" data-open="${esc(h.id)}">
+        <span class="t-time">${esc(fmtTime(h.time))}</span>
+        <div class="t-emoji">${esc(h.emoji)}</div>
         <div class="t-body">
           <div class="t-name">${esc(h.name)}</div>
           <div class="t-meta">
@@ -505,7 +524,7 @@ function renderTimeline(all, sel, isToday) {
             ${tag}
           </div>
         </div>
-        <button class="check ${done ? 'on' : ''}" data-toggle="${h.id}" aria-label="Marcar ${esc(h.name)}">
+        <button class="check ${done ? 'on' : ''}" data-toggle="${esc(h.id)}" aria-label="Marcar ${esc(h.name)}" aria-pressed="${done}">
           <svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </button>
       </div>`;
@@ -552,12 +571,12 @@ function renderHabits(all) {
       return `<i class="${isDone(h, dk(d)) ? 'on' : ''}" title="${dk(d)}"></i>`;
     }).join('');
     return `
-      <article class="card h-card" style="--hc:${h.color};animation-delay:${i * 40}ms" data-open="${h.id}">
+      <article class="card h-card" style="--hc:${esc(h.color)};animation-delay:${i * 40}ms" data-open="${esc(h.id)}">
         <div class="h-top">
-          <div class="h-emoji">${h.emoji}</div>
+          <div class="h-emoji">${esc(h.emoji)}</div>
           <div style="min-width:0">
             <div class="h-name">${esc(h.name)}</div>
-            <div class="h-sub">${fmtTime(h.time)} · ${fmtDuration(h.duration)} · ${esc(h.category)}</div>
+            <div class="h-sub">${esc(fmtTime(h.time))} · ${fmtDuration(h.duration)} · ${esc(h.category)}</div>
           </div>
         </div>
         <div class="h-stats">
@@ -626,9 +645,9 @@ function renderStats(all) {
   // Ranking
   const ranked = state.habits.map(h => ({ h, s: all.perHabit.get(h.id) })).sort((a, b) => b.s.rate30 - a.s.rate30);
   $('#ranking').innerHTML = ranked.length ? ranked.map(({ h, s }, i) => `
-    <div class="rank-row" style="--hc:${h.color}">
+    <div class="rank-row" style="--hc:${esc(h.color)}">
       <span class="rank-pos">#${i + 1}</span>
-      <div class="rank-emoji">${h.emoji}</div>
+      <div class="rank-emoji">${esc(h.emoji)}</div>
       <span class="rank-name">${esc(h.name)}</span>
       <div class="rank-track"><div class="rank-fill" style="width:${s.rate30}%"></div></div>
       <span class="rank-pct">${s.rate30}%</span>
@@ -698,14 +717,14 @@ function renderDetail(all) {
   $('#detailBody').innerHTML = `
     <div class="modal-head">
       <div class="detail-hero">
-        <div class="h-emoji">${h.emoji}</div>
+        <div class="h-emoji">${esc(h.emoji)}</div>
         <div>
-          <h2>${esc(h.name)}</h2>
-          <p class="muted">${fmtTime(h.time)} · ${fmtDuration(h.duration)} · ${fmtDays(h.days)}</p>
+          <h2 id="detailTitle">${esc(h.name)}</h2>
+          <p class="muted">${esc(fmtTime(h.time))} · ${fmtDuration(h.duration)} · ${fmtDays(h.days)}</p>
           ${h.note ? `<p class="small" style="margin-top:4px;color:var(--hc)">💡 ${esc(h.note)}</p>` : ''}
         </div>
       </div>
-      <button class="icon-btn" data-close>✕</button>
+      <button class="icon-btn" data-close aria-label="Cerrar">✕</button>
     </div>
     <div class="detail-stats">
       <div class="h-stat"><b>🔥 ${st.current}</b><span>Racha actual</span></div>
@@ -715,9 +734,9 @@ function renderDetail(all) {
     </div>
     <div>
       <div class="calendar-head">
-        <button class="icon-btn" data-month="-1">‹</button>
+        <button class="icon-btn" data-month="-1" aria-label="Mes anterior">‹</button>
         <h3>${MONTHS[m.getMonth()]} ${m.getFullYear()}</h3>
-        <button class="icon-btn" data-month="1">›</button>
+        <button class="icon-btn" data-month="1" aria-label="Mes siguiente">›</button>
       </div>
       <p class="muted small" style="text-align:center;margin:4px 0 12px">Toca un día para marcarlo o desmarcarlo</p>
       <div class="calendar">${cal}</div>
@@ -727,9 +746,9 @@ function renderDetail(all) {
       <div class="milestones">${MILESTONES.map(x => `<span class="milestone ${st.best >= x ? 'hit' : ''}">${st.best >= x ? '🏅' : '🔒'} ${x} días</span>`).join('')}</div>
     </div>
     <div class="modal-foot">
-      <button class="btn btn-danger-ghost" data-delete="${h.id}">Eliminar</button>
+      <button class="btn btn-danger-ghost" data-delete="${esc(h.id)}">Eliminar</button>
       <span class="spacer"></span>
-      <button class="btn btn-ghost" data-edit="${h.id}">Editar</button>
+      <button class="btn btn-ghost" data-edit="${esc(h.id)}">Editar</button>
       <button class="btn btn-primary" data-close>Listo</button>
     </div>`;
 }
@@ -737,12 +756,54 @@ function renderDetail(all) {
 /* =========================================================
    MODALES
    ========================================================= */
-function openModal(el) { el.classList.add('open'); el.setAttribute('aria-hidden', 'false'); }
-function closeModal(el) {
-  el.classList.remove('open'); el.setAttribute('aria-hidden', 'true');
-  if (el.id === 'detailModal') ui.detailId = null;
+const FOCUSABLE = 'button:not([disabled]):not([hidden]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const focusables = el => $$(FOCUSABLE, el).filter(x => x.offsetParent !== null);
+const topModal = () => $$('.modal-backdrop.open').pop() || null;
+const anyModalOpen = () => !!topModal();
+const returnFocus = new Map();   // modal → elemento que tenía el foco al abrirlo
+const closeHooks = new Map();    // modal → se llama al cerrarlo por cualquier vía (fondo, Esc, ✕)
+
+/** Solo el modal de arriba es interactivo; el resto de la página queda inerte. */
+function syncInert() {
+  const top = topModal();
+  $('.app').inert = !!top;
+  $$('.modal-backdrop').forEach(m => { m.inert = !!top && m !== top; });
 }
-const anyModalOpen = () => $$('.modal-backdrop.open').length > 0;
+
+function openModal(el) {
+  if (!el.classList.contains('open')) returnFocus.set(el, document.activeElement);
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+  syncInert();
+  requestAnimationFrame(() => { if (!el.contains(document.activeElement)) focusables(el)[0]?.focus(); });
+}
+function closeModal(el) {
+  if (!el || !el.classList.contains('open')) return;
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+  if (el.id === 'detailModal') ui.detailId = null;
+  syncInert();
+  const hook = closeHooks.get(el);
+  closeHooks.delete(el);
+  hook?.();
+  const back = returnFocus.get(el);
+  returnFocus.delete(el);
+  const top = topModal();
+  if (el.contains(document.activeElement)) document.activeElement.blur();   // nunca dejar el foco en un modal cerrado
+  if (back?.isConnected && (!top || top.contains(back))) back.focus({ preventScroll: true });
+}
+
+/** Mantiene el Tab dentro del modal abierto. */
+function trapFocus(e) {
+  const m = topModal();
+  if (!m) return;
+  const list = focusables(m);
+  if (!list.length) { e.preventDefault(); return; }
+  const first = list[0], last = list[list.length - 1];
+  if (!m.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
 
 /* ---------- Donaciones (Nequi / Bre-B) ----------
    La llave se arma al abrir la ventana para que los robots
@@ -767,16 +828,27 @@ async function copyDonateKey(btn) {
   toast('💜', '¡Gracias por tu apoyo!', 'Llave copiada. Pégala en tu app como llave Bre-B.');
 }
 
+/** Siempre resuelve: true con "Confirmar"; false con "Cancelar", fondo, Esc o si se abre otro. */
 function confirmDialog(title, text, okLabel = 'Confirmar') {
+  const m = $('#confirmModal');
+  closeModal(m);                           // resuelve como "no" una confirmación anterior pendiente
   return new Promise(resolve => {
-    const m = $('#confirmModal');
+    let settled = false;
+    const done = v => {
+      if (settled) return;
+      settled = true;
+      $('#confirmYes').onclick = $('#confirmNo').onclick = null;
+      closeHooks.delete(m);
+      closeModal(m);
+      resolve(v);
+    };
     $('#confirmTitle').textContent = title;
     $('#confirmText').textContent = text;
     $('#confirmYes').textContent = okLabel;
-    openModal(m);
-    const done = v => { closeModal(m); $('#confirmYes').onclick = $('#confirmNo').onclick = null; resolve(v); };
     $('#confirmYes').onclick = () => done(true);
     $('#confirmNo').onclick = () => done(false);
+    openModal(m);
+    closeHooks.set(m, () => done(false));
   });
 }
 
@@ -811,12 +883,19 @@ function suggestTime() {
 function syncForm() {
   const modal = $('#habitForm');
   modal.style.setProperty('--hc', form.color);
-  $('#fDays').innerHTML = WEEK_ORDER.map(d =>
-    `<button type="button" class="${form.days.includes(d) ? 'on' : ''}" data-day="${d}">${DAY_LETTER[d]}</button>`).join('');
-  $('#fEmoji').innerHTML = EMOJIS.map(e =>
-    `<button type="button" class="${e === form.emoji ? 'on' : ''}" data-emoji="${e}">${e}</button>`).join('');
-  $('#fColor').innerHTML = COLORS.map(c =>
-    `<button type="button" class="${c === form.color ? 'on' : ''}" data-color="${c}" style="background:${c};color:${c}" aria-label="Color ${c}"></button>`).join('');
+  // Los botones se crean una vez y luego solo se actualizan: así el foco del teclado no se pierde.
+  if (!$('#fDays').children.length) {
+    $('#fDays').innerHTML = WEEK_ORDER.map(d =>
+      `<button type="button" data-day="${d}" aria-label="${DAY_LONG[d]}">${DAY_LETTER[d]}</button>`).join('');
+    $('#fEmoji').innerHTML = EMOJIS.map(e =>
+      `<button type="button" data-emoji="${e}" aria-label="Icono ${e}">${e}</button>`).join('');
+    $('#fColor').innerHTML = COLORS.map((c, i) =>
+      `<button type="button" data-color="${c}" style="background:${c};color:${c}" aria-label="Color ${COLOR_NAMES[i]}"></button>`).join('');
+  }
+  const mark = (b, on) => { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); };
+  $$('#fDays [data-day]').forEach(b => mark(b, form.days.includes(Number(b.dataset.day))));
+  $$('#fEmoji [data-emoji]').forEach(b => mark(b, b.dataset.emoji === form.emoji));
+  $$('#fColor [data-color]').forEach(b => mark(b, b.dataset.color === form.color));
   $('#pvEmoji').textContent = form.emoji;
   $('#pvName').textContent = $('#fName').value.trim() || 'Tu hábito';
   $('#pvMeta').textContent = `${fmtTime($('#fTime').value || '00:00')} · ${form.days.length ? fmtDays(form.days) : 'Sin días'}`;
@@ -834,7 +913,7 @@ function submitHabit(e) {
     days: [...form.days].sort(),
     emoji: form.emoji,
     color: form.color,
-    category: $('#fCategory').value,
+    category: $('#fCategory').value || (form.id && getHabit(form.id)?.category) || 'Otro',
     note: $('#fNote').value.trim(),
   };
   let habit;
@@ -892,7 +971,7 @@ function renderPalette() {
     const head = it.g !== lastG ? `<li class="pl-group">${it.g}</li>` : '';
     lastG = it.g;
     return `${head}<li class="${i === paletteSel ? 'sel' : ''}" data-pi="${i}">
-      <span class="pl-icon">${it.icon}</span>${esc(it.label)}<span class="pl-hint">${it.hint || ''}</span></li>`;
+      <span class="pl-icon">${esc(it.icon)}</span>${esc(it.label)}<span class="pl-hint">${esc(it.hint || '')}</span></li>`;
   }).join('') : '<li class="pl-group">Sin resultados</li>';
   $('#paletteList .sel')?.scrollIntoView({ block: 'nearest' });
 }
@@ -978,7 +1057,7 @@ function ding() {
 function toast(icon, title, text = '', opts = {}) {
   const el = document.createElement('div');
   el.className = `toast${opts.gold ? ' gold' : ''}`;
-  el.innerHTML = `<span class="t-ico">${icon}</span><div><b>${esc(title)}</b>${text ? `<span class="muted small">${esc(text)}</span>` : ''}</div>`;
+  el.innerHTML = `<span class="t-ico">${esc(icon)}</span><div><b>${esc(title)}</b>${text ? `<span class="muted small">${esc(text)}</span>` : ''}</div>`;
   $('#toasts').append(el);
   while ($('#toasts').children.length > 4) $('#toasts').firstElementChild.remove();
   setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 350); }, opts.ms || 3200);
@@ -993,7 +1072,7 @@ function checkReminders() {
   let changed = false;
   for (const h of state.habits) {
     if (h.time !== hm || !isScheduled(h, now) || isDone(h, key)) continue;
-    const nk = `${key}|${h.id}`;
+    const nk = `${key}|${esc(h.id)}`;
     if (state.notified[nk]) continue;
     state.notified[nk] = 1; changed = true;
     toast(h.emoji, `Es hora: ${h.name}`, `${fmtDuration(h.duration)} · no rompas tu racha 🔥`, { ms: 8000 });
@@ -1036,19 +1115,27 @@ function normalizeIds(s) {
   return s;
 }
 
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+
 function importData(file) {
+  if (file.size > MAX_IMPORT_BYTES) { toast('⚠️', 'Archivo demasiado grande', 'Un respaldo de Habits pesa mucho menos de 5 MB'); return; }
   const r = new FileReader();
   r.onload = () => {
+    let data;
     try {
-      const data = JSON.parse(r.result);
-      if (!Array.isArray(data.habits) || typeof data.log !== 'object') throw new Error('formato');
-      state = normalizeIds(merge(data));
-      commitAll();
-      toast('⬆️', 'Datos importados', `${state.habits.length} hábitos`);
+      data = JSON.parse(r.result);
+      if (!data || !Array.isArray(data.habits) || !data.log || typeof data.log !== 'object') throw new Error('formato');
     } catch {
       toast('⚠️', 'Archivo no válido', 'Debe ser un respaldo de Habits');
+      return;
     }
+    const clean = normalizeIds(sanitize(data));
+    const dropped = data.habits.length - clean.habits.length;
+    state = clean;
+    commitAll();
+    toast('⬆️', 'Datos importados', `${state.habits.length} hábitos${dropped > 0 ? ` · ${dropped} descartados por no ser válidos` : ''}`);
   };
+  r.onerror = () => toast('⚠️', 'No se pudo leer el archivo');
   r.readAsText(file);
 }
 
@@ -1155,7 +1242,11 @@ function bind() {
   });
 
   // Hábitos: búsqueda, categorías, orden
-  $('#habitSearch').addEventListener('input', e => { ui.search = e.target.value; render(); });
+  let searchTimer = null;
+  $('#habitSearch').addEventListener('input', e => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { ui.search = e.target.value; render(); }, 150);
+  });
   $('#categoryChips').addEventListener('click', e => {
     const c = e.target.closest('[data-cat]');
     if (c) { ui.cat = c.dataset.cat; render(); }
@@ -1226,10 +1317,11 @@ function bind() {
       return;
     }
     if (e.key === 'Escape') {
-      const open = $$('.modal-backdrop.open').pop();
+      const open = topModal();
       if (open) closeModal(open);
       return;
     }
+    if (e.key === 'Tab') { if (anyModalOpen()) trapFocus(e); return; }
     const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName);
     if (typing || anyModalOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key.toLowerCase() === 'n') { e.preventDefault(); openHabitModal(); }
@@ -1253,7 +1345,9 @@ const AUTH_MODES = {
 const AUTH_ERRORS = [
   ['Invalid login credentials', 'Correo o contraseña incorrectos.'],
   ['Email not confirmed', 'Confirma tu correo antes de entrar (revisa también spam).'],
-  ['User already registered', 'Ese correo ya tiene cuenta. Inicia sesión.'],
+  // Mensaje neutro a propósito: no confirma si un correo ya está registrado.
+  ['User already registered', 'No se pudo crear la cuenta. Si ya tienes una, inicia sesión o recupera tu contraseña.'],
+  ['captcha', 'Completa la verificación de seguridad e inténtalo de nuevo.'],
   ['Password should be', 'La contraseña debe tener al menos 6 caracteres.'],
   ['For security purposes', 'Espera unos segundos antes de intentarlo de nuevo.'],
   ['rate limit', 'Demasiados intentos. Espera un momento.'],
@@ -1261,6 +1355,36 @@ const AUTH_ERRORS = [
 ];
 const authError = err => AUTH_ERRORS.find(([k]) => err?.message?.includes(k))?.[1] || err?.message || 'Algo salió mal. Intenta de nuevo.';
 const auth = { mode: 'login', busy: false };
+
+/* ---------- CAPTCHA (Cloudflare Turnstile, opcional) ----------
+   Se activa poniendo turnstileSiteKey en config.js y la secret key en
+   Supabase → Authentication → Attack Protection. Frena registros en masa. */
+const captcha = { token: null, widget: null };
+const captchaOn = () => !!DB.captchaSiteKey;
+function setupCaptcha() {
+  if (!captchaOn()) return;
+  $('#authCaptcha').hidden = false;
+  const s = document.createElement('script');
+  s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+  s.async = true;
+  s.onload = () => {
+    captcha.widget = window.turnstile.render('#authCaptcha', {
+      sitekey: DB.captchaSiteKey,
+      theme: 'dark',
+      language: 'es',
+      callback: t => { captcha.token = t; },
+      'expired-callback': () => { captcha.token = null; },
+      'error-callback': () => { captcha.token = null; },
+    });
+  };
+  s.onerror = () => authMsg('No se pudo cargar la verificación de seguridad. Recarga la página.');
+  document.head.append(s);
+}
+/** Los tokens son de un solo uso: tras cada intento se pide uno nuevo. */
+function resetCaptcha() {
+  captcha.token = null;
+  if (captcha.widget !== null) window.turnstile?.reset(captcha.widget);
+}
 
 function showAuth(mode = 'login') {
   $('#auth').hidden = false;
@@ -1308,16 +1432,19 @@ async function submitAuth(e) {
   if (m.fields.includes('email') && !/^\S+@\S+\.\S+$/.test(email)) return authMsg('Escribe un correo válido.');
   if (m.fields.includes('pass') && !pass) return authMsg('Escribe tu contraseña.');
   if (m.fields.includes('pass') && auth.mode !== 'login' && pass.length < 6) return authMsg('La contraseña debe tener al menos 6 caracteres.');
+  const needsCaptcha = captchaOn() && auth.mode !== 'newpass';
+  if (needsCaptcha && !captcha.token) return authMsg('Completa la verificación de seguridad.');
+  const token = needsCaptcha ? captcha.token : undefined;
 
   auth.busy = true;
   $('#authSubmit').disabled = true;
   authMsg('');
   try {
     if (auth.mode === 'login') {
-      const { error } = await DB.signIn(email, pass);
+      const { error } = await DB.signIn(email, pass, token);
       if (error) throw error;              // si todo va bien, onAuth → enterApp
     } else if (auth.mode === 'signup') {
-      const { data, error } = await DB.signUp(email, pass, name);
+      const { data, error } = await DB.signUp(email, pass, name, token);
       if (error) throw error;
       if (!data.session) {                 // Supabase pide confirmar el correo
         setAuthMode('login');
@@ -1325,7 +1452,7 @@ async function submitAuth(e) {
         authMsg('📩 Te enviamos un correo de confirmación. Ábrelo y luego inicia sesión.', true);
       }
     } else if (auth.mode === 'forgot') {
-      const { error } = await DB.resetPassword(email);
+      const { error } = await DB.resetPassword(email, token);
       if (error) throw error;
       authMsg('📩 Si ese correo tiene cuenta, te llegó un enlace para cambiar la contraseña.', true);
     } else if (auth.mode === 'newpass') {
@@ -1341,6 +1468,7 @@ async function submitAuth(e) {
   } finally {
     auth.busy = false;
     $('#authSubmit').disabled = false;
+    if (needsCaptcha) resetCaptcha();
   }
 }
 
@@ -1357,7 +1485,7 @@ async function enterApp(user) {
   try {
     const { hasProfile, ...remote } = await DB.loadState();
     if (ui.userId !== user.id) return;     // cambió de cuenta mientras cargaba
-    state = merge({ ...remote, notified: cached.notified });
+    state = sanitize({ ...remote, notified: cached.notified });
     if (!hasProfile) {                     // primera vez: crear perfil con el nombre del registro
       state.settings.name ||= user.user_metadata?.name || user.user_metadata?.full_name || '';
       saveProfile();
@@ -1390,9 +1518,19 @@ function leaveApp() {
 
 async function logout() {
   if (!cloud()) return;
-  if (!(await confirmDialog('¿Cerrar sesión?', 'Tus hábitos quedan guardados en tu cuenta.', 'Cerrar sesión'))) return;
+  const text = DB.status === 'error'
+    ? 'Hay cambios que no se pudieron sincronizar y se perderán. Toca "Error · reintentar" antes de salir si quieres conservarlos.'
+    : 'Tus hábitos quedan guardados en tu cuenta.';
+  if (!(await confirmDialog('¿Cerrar sesión?', text, 'Cerrar sesión'))) return;
   showAuthLoading('Guardando cambios…');
-  await DB.signOut();                      // espera a que terminen las escrituras pendientes
+  try {
+    const { error } = await DB.signOut();  // espera a que terminen las escrituras pendientes
+    if (error) throw error;                // si va bien, onAuth → leaveApp
+  } catch (err) {
+    console.error('[logout]', err);
+    if (cloud()) hideAuth();
+    toast('📡', 'No se pudo cerrar sesión', 'Revisa tu conexión e inténtalo de nuevo.', { ms: 5000 });
+  }
 }
 
 /** Si había hábitos del modo local (sin cuenta) en este navegador, ofrece subirlos. */
@@ -1406,7 +1544,7 @@ async function offerLocalMigration() {
     'Subir hábitos');
   try { localStorage.setItem(flag, '1'); } catch { /* ignore */ }
   if (!ok || !cloud()) return;
-  state = normalizeIds(merge({ ...legacy, settings: { ...legacy.settings, name: state.settings.name || legacy.settings.name } }));
+  state = normalizeIds(sanitize({ ...legacy, settings: { ...legacy.settings, name: state.settings.name || legacy.settings.name } }));
   commitAll();
   toast('☁️', 'Hábitos subidos', 'Ya están en tu cuenta');
 }
@@ -1422,10 +1560,12 @@ async function refreshFromServer() {
   if (document.hidden || !cloud() || !ui.userId || DB.busy || DB.status === 'error' || anyModalOpen()) return;
   if (Date.now() - (ui.lastSync || 0) < 30000) return;
   ui.lastSync = Date.now();
+  const before = { version: stateVersion, state, user: ui.userId };
   try {
     const { hasProfile, ...remote } = await DB.loadState();
-    if (DB.busy || !cloud()) return;       // hubo cambios locales mientras tanto: no pisarlos
-    state = merge({ ...remote, notified: state.notified });
+    // Si hubo cambios locales mientras llegaba la respuesta, no pisarlos: se reintenta en la próxima visita.
+    if (DB.busy || !cloud() || stateVersion !== before.version || state !== before.state || ui.userId !== before.user) return;
+    state = sanitize({ ...remote, notified: state.notified });
     save();
     render();
   } catch { /* sin red: se reintenta en la próxima visita */ }
@@ -1497,6 +1637,7 @@ function init() {
   }
 
   bindAuth();
+  setupCaptcha();
   ui.recovery = /type=recovery/.test(location.hash);
   DB.onStatus(updateSync);
   DB.onError(label => toast('⚠️', 'No se pudo sincronizar', `Falló: ${label}. Toca "Error · reintentar" en tu perfil.`, { ms: 6000 }));

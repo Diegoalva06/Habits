@@ -176,7 +176,7 @@
         <div class="toolbar">
           <div class="search">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-            <input type="text" id="habitSearch" placeholder="Buscar hábito..." />
+            <input type="search" id="habitSearch" placeholder="Buscar hábito..." aria-label="Buscar hábito" />
           </div>
           <div class="chips" id="categoryChips"></div>
           <select id="habitSort" class="select">
@@ -270,21 +270,21 @@
               <h3>Recordatorios</h3>
               <p class="muted">Notificación a la hora de cada hábito (con la pestaña abierta).</p>
             </div>
-            <label class="switch"><input type="checkbox" id="notifToggle" /><span></span></label>
+            <label class="switch"><input type="checkbox" id="notifToggle" role="switch" aria-label="Recordatorios" /><span></span></label>
           </div>
           <div class="card setting">
             <div>
               <h3>Formato 12 horas</h3>
               <p class="muted">Muestra las horas como 7:30 a.m. en vez de 07:30.</p>
             </div>
-            <label class="switch"><input type="checkbox" id="h12Toggle" /><span></span></label>
+            <label class="switch"><input type="checkbox" id="h12Toggle" role="switch" aria-label="Formato 12 horas" /><span></span></label>
           </div>
           <div class="card setting">
             <div>
               <h3>Sonidos</h3>
               <p class="muted">Un pequeño "ding" al completar.</p>
             </div>
-            <label class="switch"><input type="checkbox" id="soundToggle" /><span></span></label>
+            <label class="switch"><input type="checkbox" id="soundToggle" role="switch" aria-label="Sonidos" /><span></span></label>
           </div>
           <div class="card setting">
             <div>
@@ -333,10 +333,10 @@
 
   <!-- ============ MODAL HÁBITO ============ -->
   <div class="modal-backdrop" id="habitModal" aria-hidden="true">
-    <form class="modal" id="habitForm" autocomplete="off">
+    <form class="modal" id="habitForm" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-head">
         <h2 id="modalTitle">Nuevo hábito</h2>
-        <button type="button" class="icon-btn" data-close>✕</button>
+        <button type="button" class="icon-btn" data-close aria-label="Cerrar">✕</button>
       </div>
 
       <div class="preview" id="habitPreview">
@@ -414,15 +414,15 @@
 
   <!-- ============ DETALLE HÁBITO ============ -->
   <div class="modal-backdrop" id="detailModal" aria-hidden="true">
-    <div class="modal modal-wide" id="detailBody"></div>
+    <div class="modal modal-wide" id="detailBody" role="dialog" aria-modal="true" aria-labelledby="detailTitle"></div>
   </div>
 
   <!-- ============ COMMAND PALETTE ============ -->
   <div class="modal-backdrop palette-backdrop" id="palette" aria-hidden="true">
-    <div class="palette">
+    <div class="palette" role="dialog" aria-modal="true" aria-label="Paleta de comandos">
       <div class="palette-input">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="text" id="paletteInput" placeholder="Escribe un comando o un hábito..." />
+        <input type="text" id="paletteInput" placeholder="Escribe un comando o un hábito..." aria-label="Buscar comando o hábito" />
         <kbd>Esc</kbd>
       </div>
       <ul class="palette-list" id="paletteList"></ul>
@@ -431,22 +431,22 @@
 
   <!-- ============ CONFIRM ============ -->
   <div class="modal-backdrop" id="confirmModal" aria-hidden="true">
-    <div class="modal modal-sm">
+    <div class="modal modal-sm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText">
       <h2 id="confirmTitle">¿Seguro?</h2>
       <p class="muted" id="confirmText"></p>
       <div class="modal-foot">
         <span class="spacer"></span>
-        <button class="btn btn-ghost" id="confirmNo">Cancelar</button>
-        <button class="btn btn-danger" id="confirmYes">Confirmar</button>
+        <button type="button" class="btn btn-ghost" id="confirmNo">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmYes">Confirmar</button>
       </div>
     </div>
   </div>
 
   <!-- ============ DONACIONES ============ -->
   <div class="modal-backdrop" id="donateModal" aria-hidden="true">
-    <div class="modal modal-sm donate">
+    <div class="modal modal-sm donate" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
       <div class="modal-head">
-        <h2>Apoya Habits 💜</h2>
+        <h2 id="donateTitle">Apoya Habits 💜</h2>
         <button type="button" class="icon-btn" data-close aria-label="Cerrar">✕</button>
       </div>
       <p class="muted">Si Habits te ayuda a construir tu mejor versión, puedes invitarme un café ☕. Cualquier aporte suma.</p>
@@ -515,6 +515,7 @@
           <span>Contraseña</span>
           <input type="password" id="authPass" class="input" minlength="6" autocomplete="current-password" placeholder="Mínimo 6 caracteres" />
         </label>
+        <div class="auth-captcha" id="authCaptcha" hidden></div>
         <p class="auth-msg" id="authMsg" role="status"></p>
         <button type="submit" class="btn btn-primary auth-submit" id="authSubmit">Entrar</button>
         <div class="auth-links">
@@ -534,9 +535,14 @@
 
   <div class="toasts" id="toasts"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <!-- Archivo estático del paquete (no el .min.js que jsDelivr genera al vuelo) para que el hash SRI sea estable.
+       Si actualizas la versión, recalcula el hash: ver README. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"
+          integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="halloween.js"></script>
   <script src="config.js"></script>
+  <script src="core.js"></script>
   <script src="db.js"></script>
   <script src="app.js"></script>
 </body>

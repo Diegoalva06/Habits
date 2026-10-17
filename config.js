@@ -10,8 +10,11 @@
    Si dejas los valores de ejemplo, la app funciona en modo local
    (cada navegador guarda sus hábitos, sin cuentas).
    ========================================================= */
-window.HABITS_CONFIG = {
+window.HABITS_CONFIG = Object.freeze({
   supabaseUrl: 'https://hqsjczlpagfbyqzlxbrr.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imhxc2pjemxwYWdmYnlxemx4YnJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwMzEzNjksImV4cCI6MjEwNzYwNzM2OX0.9znbuBIIuj-y4zt2Inj1b5dHU-NJhtI59XtHBBfD2TY',
   googleLogin: false, // ponlo en true cuando actives Google en Authentication → Providers
-};
+  // CAPTCHA contra registros en masa (Cloudflare Turnstile). Pega aquí la *site key* (es pública)
+  // y la *secret key* en Supabase → Authentication → Attack Protection. Vacío = desactivado.
+  turnstileSiteKey: '',
+});

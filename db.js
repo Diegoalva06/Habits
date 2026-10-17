@@ -10,7 +10,7 @@
    app trabaja solo con localStorage.
    ========================================================= */
 const DB = (() => {
-  const cfg = window.HABITS_CONFIG || {};
+  const cfg = Object.freeze({ ...(window.HABITS_CONFIG || {}) });
   const configured = !!(cfg.supabaseUrl && cfg.supabaseAnonKey && !/TU_/.test(cfg.supabaseUrl + cfg.supabaseAnonKey));
   const enabled = configured && !!window.supabase;
   const client = enabled ? window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey) : null;
@@ -57,10 +57,16 @@ const DB = (() => {
     createdAt: r.created_on,
   });
 
-  async function selectAll(table, columns) {
+  /**
+   * Lee todas las filas del usuario, por páginas. Filtra por user_id aunque RLS ya lo
+   * haga (defensa en profundidad) y ordena por la clave para que las páginas no se solapen.
+   */
+  async function selectAll(table, columns, orderBy) {
     const PAGE = 1000, rows = [];
     for (let from = 0; ; from += PAGE) {
-      const { data, error } = await client.from(table).select(columns).range(from, from + PAGE - 1);
+      let q = client.from(table).select(columns).eq('user_id', user.id);
+      for (const col of orderBy) q = q.order(col, { ascending: true });
+      const { data, error } = await q.range(from, from + PAGE - 1);
       if (error) throw error;
       rows.push(...data);
       if (data.length < PAGE) return rows;
@@ -82,6 +88,7 @@ const DB = (() => {
     enabled,
     configured,
     googleLogin: !!cfg.googleLogin,
+    captchaSiteKey: typeof cfg.turnstileSiteKey === 'string' ? cfg.turnstileSiteKey : '',
     get user() { return user; },
     get status() { return status; },
     get busy() { return pending > 0; },
@@ -96,25 +103,32 @@ const DB = (() => {
         setTimeout(() => fn(event, user), 0);
       });
     },
-    signIn: (email, password) => client.auth.signInWithPassword({ email, password }),
-    signUp: (email, password, name) =>
-      client.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: redirectTo } }),
+    signIn: (email, password, captchaToken) =>
+      client.auth.signInWithPassword({ email, password, options: { captchaToken } }),
+    signUp: (email, password, name, captchaToken) =>
+      client.auth.signUp({ email, password, options: { data: { name }, emailRedirectTo: redirectTo, captchaToken } }),
     signInGoogle: () => client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } }),
-    resetPassword: email => client.auth.resetPasswordForEmail(email, { redirectTo }),
+    resetPassword: (email, captchaToken) => client.auth.resetPasswordForEmail(email, { redirectTo, captchaToken }),
     updatePassword: password => client.auth.updateUser({ password }),
-    signOut: async () => { await queue; return client.auth.signOut(); },
+    /** Espera las escrituras pendientes (máx. 10 s). Si no hay red, cierra al menos en este dispositivo. */
+    async signOut() {
+      await Promise.race([queue, new Promise(r => setTimeout(r, 10000))]);
+      const res = await client.auth.signOut();
+      return res.error ? client.auth.signOut({ scope: 'local' }) : res;
+    },
 
     /* ---------- Lectura ---------- */
     async loadState() {
       const [profile, habits, completions] = await Promise.all([
         client.from('profiles').select('settings, unlocked').eq('id', user.id).maybeSingle(),
-        selectAll('habits', '*'),
-        selectAll('completions', 'habit_id, day'),
+        selectAll('habits', '*', ['id']),
+        selectAll('completions', 'habit_id, day', ['day', 'habit_id']),
       ]);
       if (profile.error) throw profile.error;
       const log = {};
       for (const c of completions) (log[c.day] ||= []).push(c.habit_id);
-      habits.sort((a, b) => a.inserted_at.localeCompare(b.inserted_at));
+      // Orden estable: por hora del hábito y, a igual hora, por fecha de creación.
+      habits.sort((a, b) => a.at_time.localeCompare(b.at_time) || a.inserted_at.localeCompare(b.inserted_at));
       return {
         habits: habits.map(fromRow),
         log,
@@ -129,11 +143,11 @@ const DB = (() => {
       () => client.from('habits').upsert({ ...toRow(h), user_id: user.id })),
 
     deleteHabit: id => write('eliminar hábito',
-      () => client.from('habits').delete().eq('id', id)),
+      () => client.from('habits').delete().eq('id', id).eq('user_id', user.id)),
 
     setCompletion: (habitId, day, done) => write(done ? 'completar' : 'desmarcar', () => done
       ? client.from('completions').upsert({ habit_id: habitId, day, user_id: user.id }, { onConflict: 'habit_id,day', ignoreDuplicates: true })
-      : client.from('completions').delete().eq('habit_id', habitId).eq('day', day)),
+      : client.from('completions').delete().eq('habit_id', habitId).eq('day', day).eq('user_id', user.id)),
 
     saveProfile(settings, unlocked) {
       clearTimeout(profileTimer);

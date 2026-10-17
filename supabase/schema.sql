@@ -65,3 +65,9 @@ create policy "completions: dueño" on public.completions
     user_id = (select auth.uid())
     and exists (select 1 from public.habits h where h.id = habit_id and h.user_id = (select auth.uid()))
   );
+
+-- =========================================================
+-- Límites extra (emoji sin HTML, días 0-6, máx. 200 hábitos,
+-- fechas razonables, perfil pequeño): ver
+-- supabase/migrations/20261017_hardening.sql y ejecútalo también.
+-- =========================================================

@@ -1,0 +1,16 @@
+# Cabeceras de seguridad para Netlify (https://docs.netlify.com/routing/headers/)
+# - CSP: solo se ejecuta JS propio, el SDK de Supabase (con SRI) y, si se activa, el CAPTCHA de Cloudflare.
+#   'unsafe-inline' en style-src hace falta porque la interfaz usa atributos style="".
+# - frame-ancestors / X-Frame-Options: nadie puede meter la app en un iframe (clickjacking).
+# Si cambias de proyecto de Supabase, actualiza connect-src.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://hqsjczlpagfbyqzlxbrr.supabase.co wss://hqsjczlpagfbyqzlxbrr.supabase.co; frame-src https://challenges.cloudflare.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; upgrade-insecure-requests
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# El código de pruebas no forma parte de la app
+/tests/*
+  X-Robots-Tag: noindex
