@@ -533,11 +533,11 @@
         </label>
         <label class="field" id="authEmailField">
           <span>Correo</span>
-          <input type="email" id="authEmail" class="input" autocomplete="email" placeholder="tu@correo.com" />
+          <input type="email" id="authEmail" name="email" class="input" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false" placeholder="tu@correo.com" />
         </label>
         <label class="field" id="authPassField">
           <span>Contraseña</span>
-          <input type="password" id="authPass" class="input" minlength="6" autocomplete="current-password" placeholder="Mínimo 6 caracteres" />
+          <input type="password" id="authPass" name="password" class="input" minlength="6" autocomplete="current-password" placeholder="Mínimo 6 caracteres" />
         </label>
         <div class="auth-captcha" id="authCaptcha" hidden></div>
         <p class="auth-msg" id="authMsg" role="status"></p>

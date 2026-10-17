@@ -1488,6 +1488,8 @@ function handleAuth(event, user) {
 
 async function enterApp(user) {
   ui.userId = user.id;
+  // Pide que el navegador no borre la sesión guardada cuando le falte espacio (sobre todo iPhone)
+  navigator.storage?.persist?.().catch(() => {});
   showAuthLoading('Cargando tus hábitos…');
   const cached = load();
   try {
