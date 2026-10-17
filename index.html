@@ -2,9 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#07070c" />
+  <meta name="description" content="Crea hábitos, mantén tus rachas, sube de nivel y desbloquea logros." />
   <title>Habits — Construye tu mejor versión</title>
+  <!-- PWA: instalable en Android, iPhone y escritorio -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Habits" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -103,6 +111,15 @@
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
           </button>
         </header>
+
+        <!-- Nivel en móvil (en escritorio está en la barra lateral) -->
+        <button class="m-level" data-view="awards" aria-label="Ver logros">
+          <span class="level-badge" id="mLevelBadge">Nv. 1</span>
+          <span class="m-level-body">
+            <span class="m-level-top"><span id="mLevelTitle">Novato</span><span id="mLevelXp">0 XP</span></span>
+            <span class="xp-bar"><span class="xp-fill" id="mXpFill"></span></span>
+          </span>
+        </button>
 
         <!-- Bento -->
         <div class="bento">
@@ -257,6 +274,13 @@
               <p class="muted" id="accountEmail">—</p>
             </div>
             <button class="btn btn-ghost" data-action="logout">Cerrar sesión</button>
+          </div>
+          <div class="card setting" id="installCard" hidden>
+            <div>
+              <h3>Instalar Habits 📲</h3>
+              <p class="muted" id="installText">Tenla en tu pantalla de inicio como una app, a pantalla completa.</p>
+            </div>
+            <button class="btn btn-primary" id="installBtn">Instalar</button>
           </div>
           <div class="card setting">
             <div>

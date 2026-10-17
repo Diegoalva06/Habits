@@ -16,6 +16,16 @@ Frontend en HTML/CSS/JS puro y backend con [Supabase](https://supabase.com) (aut
 | `supabase/migrations/` | Cambios posteriores al esquema (límites y validaciones) |
 | `_headers` | Cabeceras de seguridad de Netlify (CSP, anti-clickjacking…) |
 | `tests/` | Tests del núcleo (`node --test`) |
+| `manifest.webmanifest`, `icons/` | PWA: nombre, colores e íconos al instalarla |
+| `sw.js` | Service worker: la app abre sin internet |
+
+## App instalable (PWA)
+
+- **Android / Chrome / Edge**: Ajustes → *Instalar Habits*.
+- **iPhone**: en Safari, Compartir → *Agregar a inicio*.
+
+Al editar `sw.js`: si agregas archivos a `SHELL`, sube la versión de `CACHE`; y si actualizas
+la versión de supabase-js en `index.html`, cambia también `SDK` en `sw.js`.
 
 Sin configurar `config.js`, la app funciona en **modo local** (sin cuentas, datos en el navegador).
 

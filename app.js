@@ -231,6 +231,7 @@ function toggle(id, key, originEl) {
 
   if (completing) {
     ding();
+    navigator.vibrate?.(15);   // pequeño toque háptico en Android (iOS lo ignora)
     if (originEl) {
       const r = originEl.getBoundingClientRect();
       burst(r.left + r.width / 2, r.top + r.height / 2, 34, [h.color, '#ffffff', '#fbbf24']);
@@ -357,6 +358,11 @@ function renderSidebar(all) {
   $('#levelXp').textContent = `${L.xp - L.base} / ${L.next - L.base} XP`;
   $('#xpFill').style.width = `${Math.max(2, L.pct)}%`;
   $('#levelTitle').textContent = `${L.title} · ${L.xp} XP totales`;
+  // Versión compacta para móvil (la barra lateral se oculta)
+  $('#mLevelBadge').textContent = `Nv. ${L.level}`;
+  $('#mLevelTitle').textContent = L.title;
+  $('#mLevelXp').textContent = `${L.xp - L.base} / ${L.next - L.base} XP`;
+  $('#mXpFill').style.width = `${Math.max(2, L.pct)}%`;
   if (cloud()) {
     const display = state.settings.name || (DB.user.email || 'Tú').split('@')[0] || 'Tú';
     $('#userAvatar').textContent = display[0].toUpperCase();
@@ -616,6 +622,8 @@ function renderStats(all) {
     cells += `<i class="l${lv} ${dk(d) === dk(t) ? 'today' : ''}" title="${d.getDate()} ${MONTHS[d.getMonth()]}: ${info.done}/${info.total}"></i>`;
   }
   $('#heatmap').innerHTML = cells;
+  // En pantallas angostas el mapa desborda: mostrar primero las semanas más recientes
+  $('.heatmap-wrap').scrollLeft = $('.heatmap-wrap').scrollWidth;
 
   // Barras 14 días
   $('#bars').innerHTML = Array.from({ length: 14 }, (_, k) => {
@@ -1620,9 +1628,59 @@ function bindAuth() {
   window.addEventListener('focus', refreshFromServer);
 }
 
+/* =========================================================
+   PWA: service worker (offline) e instalación como app
+   ========================================================= */
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+// iPadOS se presenta como Mac; se distingue por la pantalla táctil
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installPrompt = null;   // evento de Chrome/Edge/Android para mostrar el diálogo de instalación
+
+function updateInstallCard() {
+  const card = $('#installCard');
+  if (isStandalone()) { card.hidden = true; return; }
+  if (installPrompt) {
+    card.hidden = false;
+    $('#installBtn').hidden = false;
+    $('#installText').textContent = 'Tenla en tu pantalla de inicio como una app, a pantalla completa.';
+  } else if (isIOS()) {
+    // iOS no permite instalar con un botón: hay que hacerlo desde el menú Compartir
+    card.hidden = false;
+    $('#installBtn').hidden = true;
+    $('#installText').textContent = 'Toca Compartir (el cuadrado con la flecha ↑) y luego "Agregar a inicio".';
+  } else {
+    card.hidden = true;
+  }
+}
+
+function setupPWA() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(err => console.warn('[sw]', err));
+  }
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();   // en vez de la mini-barra del navegador, usamos nuestro botón en Ajustes
+    installPrompt = e;
+    updateInstallCard();
+  });
+  window.addEventListener('appinstalled', () => {
+    installPrompt = null;
+    updateInstallCard();
+    toast('📲', 'Habits instalada', 'Ya la tienes en tu pantalla de inicio');
+  });
+  $('#installBtn').addEventListener('click', async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;   // el evento solo sirve una vez
+    updateInstallCard();
+  });
+  updateInstallCard();
+}
+
 function init() {
   resizeCanvas();
   bind();
+  setupPWA();
 
   // Sin Supabase configurado → modo local (como antes, sin cuentas)
   if (!DB.enabled) {
