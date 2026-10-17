@@ -13,7 +13,8 @@ Frontend en HTML/CSS/JS puro y backend con [Supabase](https://supabase.com) (aut
 | `db.js` | Capa de datos con Supabase (auth, lectura y escrituras en cola) |
 | `config.js` | URL y anon key de tu proyecto Supabase |
 | `supabase/schema.sql` | Tablas y políticas de seguridad (RLS) |
-| `supabase/migrations/` | Cambios posteriores al esquema (límites y validaciones) |
+| `supabase/migrations/` | Cambios posteriores al esquema (límites, validaciones, push) |
+| `supabase/functions/send-reminders/` | Edge Function que envía los recordatorios push |
 | `_headers` | Cabeceras de seguridad de Netlify (CSP, anti-clickjacking…) |
 | `tests/` | Tests del núcleo (`node --test`) |
 | `manifest.webmanifest`, `icons/` | PWA: nombre, colores e íconos al instalarla |
@@ -23,6 +24,14 @@ Frontend en HTML/CSS/JS puro y backend con [Supabase](https://supabase.com) (aut
 
 - **Android / Chrome / Edge**: Ajustes → *Instalar Habits*.
 - **iPhone**: en Safari, Compartir → *Agregar a inicio*.
+
+### Recordatorios con la app cerrada (push)
+
+1. Ejecuta `supabase/migrations/20261018_push.sql` en el SQL Editor (activa pg_cron y pg_net,
+   crea las tablas y programa el envío cada minuto).
+2. Despliega la función `supabase/functions/send-reminders` **con "Verify JWT" desactivado**
+   (ella misma verifica quién la llama). La primera vez genera las llaves VAPID y las guarda en Vault.
+3. En la app: Ajustes → Recordatorios → activar → **Probar**. En iPhone, desde la app instalada.
 
 Al editar `sw.js`: si agregas archivos a `SHELL`, sube la versión de `CACHE`; y si actualizas
 la versión de supabase-js en `index.html`, cambia también `SDK` en `sw.js`.

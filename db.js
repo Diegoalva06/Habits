@@ -177,5 +177,26 @@ const DB = (() => {
 
     /** Espera a que terminen las escrituras pendientes. */
     flush: () => queue,
+
+    /* ---------- Notificaciones push (ver supabase/migrations/20261018_push.sql) ---------- */
+    async pushPublicKey() {
+      const { data, error } = await client.rpc('push_public_key');
+      if (error) throw error;
+      return data;
+    },
+    async registerPush(endpoint, p256dh, auth, tz) {
+      const { error } = await client.rpc('push_register', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth, p_tz: tz });
+      if (error) throw error;
+    },
+    async unregisterPush(endpoint) {
+      const { error } = await client.rpc('push_unregister', { p_endpoint: endpoint });
+      if (error) throw error;
+    },
+    /** Pide al servidor una notificación de prueba para los dispositivos de esta cuenta. */
+    async testPush() {
+      const { data, error } = await client.functions.invoke('send-reminders', { body: { test: true } });
+      if (error) throw error;
+      return data;   // { devices, sent }
+    },
   };
 })();

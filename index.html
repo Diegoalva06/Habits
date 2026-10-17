@@ -292,9 +292,12 @@
           <div class="card setting">
             <div>
               <h3>Recordatorios</h3>
-              <p class="muted">Notificación a la hora de cada hábito (con la pestaña abierta).</p>
+              <p class="muted" id="notifText">Notificación a la hora de cada hábito (con la pestaña abierta).</p>
             </div>
-            <label class="switch"><input type="checkbox" id="notifToggle" role="switch" aria-label="Recordatorios" /><span></span></label>
+            <div class="row-btns notif-ctrls">
+              <button class="btn btn-ghost" id="pushTestBtn" hidden>Probar</button>
+              <label class="switch"><input type="checkbox" id="notifToggle" role="switch" aria-label="Recordatorios" /><span></span></label>
+            </div>
           </div>
           <div class="card setting">
             <div>

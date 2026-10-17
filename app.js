@@ -684,7 +684,17 @@ function renderAwards(all) {
 function renderSettings() {
   const n = $('#userName');
   if (document.activeElement !== n) n.value = state.settings.name;
-  $('#notifToggle').checked = state.settings.notifications;
+  // Los avisos dependen del permiso de ESTE dispositivo, aunque el ajuste se comparta entre dispositivos
+  const granted = 'Notification' in window && Notification.permission === 'granted';
+  $('#notifToggle').checked = state.settings.notifications && granted;
+  $('#pushTestBtn').hidden = !ui.push;
+  $('#notifText').textContent = ui.push
+    ? 'Te avisamos a la hora de cada hábito, aunque la app esté cerrada.'
+    : isIOS() && !isStandalone()
+      ? 'En iPhone, instala la app (arriba) y actívalos desde ella para recibir avisos con la app cerrada.'
+      : cloud() && pushSupported()
+        ? 'Te avisamos a la hora de cada hábito, aunque la app esté cerrada.'
+        : 'Notificación a la hora de cada hábito (con la app abierta).';
   $('#soundToggle').checked = state.settings.sound;
   $('#h12Toggle').checked = state.settings.h12;
 }
@@ -1084,7 +1094,8 @@ function checkReminders() {
     if (state.notified[nk]) continue;
     state.notified[nk] = 1; changed = true;
     toast(h.emoji, `Es hora: ${h.name}`, `${fmtDuration(h.duration)} · no rompas tu racha 🔥`, { ms: 8000 });
-    if (state.settings.notifications && 'Notification' in window && Notification.permission === 'granted') {
+    // Con push activo el aviso del sistema ya llega desde el servidor: no duplicarlo
+    if (!ui.push && state.settings.notifications && 'Notification' in window && Notification.permission === 'granted') {
       try { new Notification(`${h.emoji} ${h.name}`, { body: `Es hora de tu hábito · ${fmtTime(h.time)}`, tag: nk }); } catch { /* ignore */ }
     }
   }
@@ -1304,13 +1315,45 @@ function bind() {
   $('#soundToggle').addEventListener('change', e => { state.settings.sound = e.target.checked; saveProfile(); if (e.target.checked) ding(); });
   $('#h12Toggle').addEventListener('change', e => { state.settings.h12 = e.target.checked; saveProfile(); render(); });
   $('#notifToggle').addEventListener('change', async e => {
-    if (!e.target.checked) { state.settings.notifications = false; saveProfile(); return; }
-    if (!('Notification' in window)) { toast('⚠️', 'Tu navegador no soporta notificaciones'); e.target.checked = false; return; }
+    const tog = e.target;
+    if (!tog.checked) {
+      state.settings.notifications = false;
+      saveProfile();
+      await pushOff();
+      renderSettings();
+      return;
+    }
+    if (!('Notification' in window)) {
+      tog.checked = false;
+      if (isIOS() && !isStandalone()) toast('📲', 'Primero instala la app', 'Compartir → Agregar a inicio, y activa los recordatorios desde ahí', { ms: 7000 });
+      else toast('⚠️', 'Tu navegador no soporta notificaciones');
+      return;
+    }
     const perm = await Notification.requestPermission();
     state.settings.notifications = perm === 'granted';
-    e.target.checked = state.settings.notifications;
+    tog.checked = state.settings.notifications;
     saveProfile();
-    toast(perm === 'granted' ? '🔔' : '🔕', perm === 'granted' ? 'Recordatorios activados' : 'Permiso denegado');
+    if (perm !== 'granted') {
+      toast('🔕', 'Permiso denegado', 'Actívalo en los ajustes del navegador o del teléfono');
+      return;
+    }
+    tog.disabled = true;
+    const ok = await pushOn();
+    tog.disabled = false;
+    renderSettings();
+    toast('🔔', 'Recordatorios activados', ok ? 'Te avisaremos aunque la app esté cerrada' : 'Solo con la app abierta en este dispositivo');
+  });
+  $('#pushTestBtn').addEventListener('click', async e => {
+    e.target.disabled = true;
+    try {
+      const r = await DB.testPush();
+      toast('📨', r?.sent ? 'Notificación enviada' : 'No se pudo enviar', r?.sent ? 'Debería llegarte en unos segundos' : 'Desactiva y vuelve a activar los recordatorios');
+    } catch (err) {
+      console.error('[push test]', err);
+      toast('⚠️', 'No se pudo enviar la prueba', 'Revisa tu conexión');
+    } finally {
+      e.target.disabled = false;
+    }
   });
   $('#exportBtn').addEventListener('click', exportData);
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importData(e.target.files[0]); e.target.value = ''; });
@@ -1513,6 +1556,8 @@ async function enterApp(user) {
   $('#accountEmail').textContent = user.email;
   if (ui.recovery) showAuth('newpass'); else hideAuth();
   startApp();
+  // Renueva el registro de este dispositivo (zona horaria, cuenta) si ya tenía avisos activados
+  if (state.settings.notifications) pushOn().then(() => { if (ui.view === 'settings') render(); });
   if (!ui.recovery) offerLocalMigration();
 }
 
@@ -1534,6 +1579,7 @@ async function logout() {
   if (!(await confirmDialog('¿Cerrar sesión?', text, 'Cerrar sesión'))) return;
   showAuthLoading('Guardando cambios…');
   try {
+    await pushOff();   // este dispositivo deja de recibir los avisos de esta cuenta
     const { error } = await DB.signOut();  // espera a que terminen las escrituras pendientes
     if (error) throw error;                // si va bien, onAuth → leaveApp
   } catch (err) {
@@ -1652,6 +1698,56 @@ function updateInstallCard() {
     $('#installText').textContent = 'Toca Compartir (el cuadrado con la flecha ↑) y luego "Agregar a inicio".';
   } else {
     card.hidden = true;
+  }
+}
+
+/* ---------- Notificaciones push: avisos con la app cerrada ----------
+   El servidor (Edge Function send-reminders) envía el aviso a la hora de cada hábito;
+   aquí solo se registra este dispositivo. En iPhone requiere la app instalada. */
+const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const b64urlBytes = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
+const sameBytes = (buf, bytes) => { const a = new Uint8Array(buf); return a.length === bytes.length && a.every((x, i) => x === bytes[i]); };
+const swReady = () => Promise.race([
+  navigator.serviceWorker.ready,
+  new Promise((_, rej) => setTimeout(() => rej(new Error('Service worker no disponible')), 10000)),
+]);
+
+/** Suscribe este dispositivo y lo registra en la cuenta. Devuelve si quedó activo. */
+async function pushOn() {
+  if (!cloud() || !pushSupported() || Notification.permission !== 'granted') return (ui.push = false);
+  try {
+    const key = await DB.pushPublicKey();
+    if (!key) throw new Error('El servidor aún no tiene llave VAPID');
+    const appKey = b64urlBytes(key);
+    const reg = await swReady();
+    let sub = await reg.pushManager.getSubscription();
+    // Una suscripción hecha con otra llave ya no sirve
+    if (sub && sub.options.applicationServerKey && !sameBytes(sub.options.applicationServerKey, appKey)) {
+      await sub.unsubscribe();
+      sub = null;
+    }
+    sub ||= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey });
+    const j = sub.toJSON();
+    await DB.registerPush(j.endpoint, j.keys.p256dh, j.keys.auth, Intl.DateTimeFormat().resolvedOptions().timeZone);
+    return (ui.push = true);
+  } catch (err) {
+    console.warn('[push]', err);
+    return (ui.push = false);
+  }
+}
+
+/** Deja de recibir avisos en este dispositivo (el ajuste de la cuenta no cambia). */
+async function pushOff() {
+  ui.push = false;
+  if (!pushSupported()) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) return;
+    if (cloud()) await DB.unregisterPush(sub.endpoint).catch(err => console.warn('[push]', err));
+    await sub.unsubscribe();
+  } catch (err) {
+    console.warn('[push]', err);
   }
 }
 

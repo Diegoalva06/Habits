@@ -7,6 +7,7 @@
    - SDK de Supabase y fuentes: llevan versión en la URL, así que
      se sirven desde la caché y solo se descargan una vez.
    - Nunca toca las peticiones a la API de Supabase (datos y login).
+   - Muestra los recordatorios push aunque la app esté cerrada.
    Si cambias la lista de SHELL, sube la versión de CACHE.
    ========================================================= */
 const CACHE = 'habits-v1';
@@ -65,4 +66,26 @@ self.addEventListener('fetch', e => {
   if (url.origin === location.origin) e.respondWith(networkFirst(req));
   else if (STATIC_HOSTS.includes(url.hostname)) e.respondWith(cacheFirst(req));
   // Cualquier otra cosa (API de Supabase, Turnstile…) va directo a la red
+});
+
+/* ---------- Notificaciones push (las envía la Edge Function send-reminders) ---------- */
+self.addEventListener('push', e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Habits', {
+    body: d.body || '',
+    tag: d.tag || undefined,
+    icon: 'icons/icon-192.png',
+    data: { url: d.url || './' },
+  }));
+});
+
+// Al tocar la notificación: volver a la app si ya está abierta o abrirla
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const open = list.find(c => c.url.startsWith(self.registration.scope));
+    return open ? open.focus() : self.clients.openWindow(target);
+  }));
 });
